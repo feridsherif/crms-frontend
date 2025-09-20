@@ -34,7 +34,7 @@ export interface User {
 }
 
 export interface UserRole {
-  id: string;
+  roleId: string;
   slug: string;
   name: string;
   description?: string | null;

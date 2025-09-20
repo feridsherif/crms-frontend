@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
-import { getClientIP } from '@/lib/api';
-import { isUnique } from '@/lib/db';
-import { prisma } from '@/lib/prisma';
-import { systemLog } from '@/services/system-log';
-import {
-  RoleSchema,
-  RoleSchemaType,
-} from '@/app/(protected)/user-management/roles/forms/role-schema';
 import authOptions from '@/app/api/auth/[...nextauth]/auth-options';
+import { RoleSchema } from '@/app/(protected)/user-management/roles/forms/role-schema';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 // GET: Fetch all roles with permissions
 export async function GET(request: Request) {
@@ -17,83 +11,26 @@ export async function GET(request: Request) {
   const page = Number(searchParams.get('page') || 1);
   const limit = Number(searchParams.get('limit') || 10);
   const query = searchParams.get('query') || '';
-  const sortField = searchParams.get('sort') || 'createdAt';
-  const sortDirection = searchParams.get('dir') === 'desc' ? 'desc' : 'asc';
-  const skip = (page - 1) * limit;
 
   try {
-    // Validate user session
     const session = await getServerSession(authOptions);
-
     if (!session) {
-      return NextResponse.json(
-        { message: 'Unauthorized request' },
-        { status: 401 }, // Unauthorized
-      );
+      return NextResponse.json({ message: 'Unauthorized request' }, { status: 401 });
     }
 
-    // Count total records matching the filter
-    const total = await prisma.userRole.count({
-      where: {
-        name: {
-          contains: query,
-          mode: 'insensitive',
-        },
-      },
+    // Call backend API for roles
+    const res = await fetch(`${API_BASE_URL}/admin/roles?query=${query}&page=${page}&limit=${limit}`, {
+      headers: { Authorization: `Bearer ${session.accessToken}` },
     });
-
-    let isTableEmpty = false;
-
-    if (total === 0) {
-      // Check if the entire table is empty
-      const overallTotal = await prisma.userRole.count();
-      isTableEmpty = overallTotal === 0;
-    }
-
-    // Get paginated roles with their permissions
-    const roles =
-      total > 0
-        ? await prisma.userRole.findMany({
-            skip,
-            take: limit,
-            where: {
-              name: {
-                contains: query,
-                mode: 'insensitive',
-              },
-            },
-            orderBy: {
-              [sortField]: sortDirection,
-            },
-            include: {
-              permissions: {
-                select: {
-                  permission: {
-                    select: {
-                      id: true,
-                      name: true,
-                      slug: true,
-                    },
-                  },
-                },
-              },
-            },
-          })
-        : [];
-
-    // Map permissions into a more straightforward structure
-    const formattedRoles = roles.map((role) => ({
-      ...role,
-      permissions: role.permissions?.map((rp) => rp.permission),
-    }));
+    const data = await res.json();
 
     return NextResponse.json({
-      data: formattedRoles,
+      data: data.roles || [],
       pagination: {
-        total,
+        total: data.total || 0,
         page,
       },
-      empty: isTableEmpty,
+      empty: (data.total || 0) === 0,
     });
   } catch {
     return NextResponse.json(
@@ -106,89 +43,30 @@ export async function GET(request: Request) {
 // POST: Add a new role
 export async function POST(request: NextRequest) {
   try {
-    // Validate user session
     const session = await getServerSession(authOptions);
-
     if (!session) {
-      return NextResponse.json(
-        { message: 'Unauthorized request' },
-        { status: 401 }, // Unauthorized
-      );
+      return NextResponse.json({ message: 'Unauthorized request' }, { status: 401 });
     }
 
-    const clientIp = getClientIP(request);
     const body = await request.json();
-
     const parsedData = RoleSchema.safeParse(body);
     if (!parsedData.success) {
       return NextResponse.json(
         { message: 'Invalid input. Please check your data and try again.' },
-        { status: 400 }, // Bad Request
-      );
-    }
-
-    const { name, slug, description, permissions }: RoleSchemaType =
-      parsedData.data;
-
-    // Check for uniqueness
-    const isUniqueRole = await isUnique('userRole', { slug, name });
-    if (!isUniqueRole) {
-      return NextResponse.json(
-        { message: 'Name and slug must be unique' },
         { status: 400 },
       );
     }
 
-    // Use a Prisma transaction to ensure all operations succeed or fail together
-    const createdRole = await prisma.$transaction(
-      async (tx: Prisma.TransactionClient) => {
-        // Create the new role
-        const newRole = await tx.userRole.create({
-          data: {
-            name,
-            slug,
-            description,
-          },
-        });
-
-        // Add permissions to UserRolePermission table
-        if (permissions && permissions.length > 0) {
-          const rolePermissionEntries = permissions.map(
-            (permissionId: string) => ({
-              roleId: newRole.id,
-              permissionId,
-            }),
-          );
-
-          await tx.userRolePermission.createMany({
-            data: rolePermissionEntries,
-          });
-        }
-
-        // Log the event
-        await systemLog(
-          {
-            event: 'create',
-            userId: session.user.id,
-            entityId: newRole.id,
-            entityType: 'user.role',
-            description: 'User role added.',
-            ipAddress: clientIp,
-          },
-          tx,
-        );
-
-        // Fetch the newly created role with its permissions
-        return await tx.userRole.findUnique({
-          where: { id: newRole.id },
-          include: {
-            permissions: {
-              include: { permission: true },
-            },
-          },
-        });
+    // Call backend API to create role
+    const res = await fetch(`${API_BASE_URL}/admin/roles`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.accessToken}`,
       },
-    );
+      body: JSON.stringify(parsedData.data),
+    });
+    const createdRole = await res.json();
 
     return NextResponse.json(createdRole, { status: 201 });
   } catch {

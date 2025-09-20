@@ -12,7 +12,6 @@ import {
   Captions,
   CheckCircle,
   Code,
-  Codepen,
   Coffee,
   File as DocumentIcon,
   Euro,
@@ -36,7 +35,6 @@ import {
   Network,
   Users as PeopleIcon,
   Plug,
-  ScrollText,
   Settings,
   Share2,
   Shield,
@@ -44,7 +42,6 @@ import {
   ShoppingCart,
   SquareMousePointer,
   Star,
-  Theater,
   TrendingUp,
   UserCheck,
   UserCircle,
@@ -250,33 +247,8 @@ export const MENU_SIDEBAR: MenuConfig = [
       { title: 'Donators', path: '/network/donators', disabled: true },
     ],
   },
-  {
-    title: 'Authentication',
-    icon: Shield,
-    children: [
-      {
-        title: 'Sign In',
-        path: '/signin',
-      },
-      {
-        title: 'Check Email',
-        path: '/signup',
-      },
-      {
-        title: 'Reset Password',
-        path: '/reset-password',
-      },
-      {
-        title: '2FA',
-        path: '/2fa',
-      },
-      { title: 'Welcome Message', path: '/auth/welcome-message' },
-      { title: 'Account Deactivated', path: '/auth/account-deactivated' },
-      { title: 'Error 404', path: '/error/404' },
-      { title: 'Error 500', path: '/error/500' },
-    ],
-  },
-  { heading: 'Apps' },
+
+  { heading: 'System Administration' },
   {
     title: 'User Management',
     icon: ShieldUser,
@@ -286,24 +258,36 @@ export const MENU_SIDEBAR: MenuConfig = [
         path: '/user-management/users',
       },
       {
+        title: 'Create User',
+        path: '/user-management/roles',
+      },
+    ],
+  },
+  {
+    title: 'Role Management',
+    icon: ShieldUser,
+    children: [
+      {
         title: 'Roles',
         path: '/user-management/roles',
       },
+      {
+        title: 'Create Role',
+        path: '/user-management/roles',
+      },
+    ],
+  },
+  {
+    title: 'Permissions Management',
+    icon: ShieldUser,
+    children: [
       {
         title: 'Permissions',
         path: '/user-management/permissions',
       },
       {
-        title: 'Account',
-        path: '/user-management/account',
-      },
-      {
-        title: 'Logs',
-        path: '/user-management/logs',
-      },
-      {
-        title: 'Settings',
-        path: '/user-management/settings',
+        title: 'Create Permission',
+        path: '/user-management/roles',
       },
     ],
   },
@@ -382,9 +366,6 @@ export const MENU_SIDEBAR: MenuConfig = [
       },
     ],
   },
-  { title: 'Store - Services', icon: Codepen, disabled: true },
-  { title: 'AI Promt', icon: Theater, disabled: true },
-  { title: 'Invoice Generator', icon: ScrollText, disabled: true },
 ];
 
 export const MENU_SIDEBAR_CUSTOM: MenuConfig = [

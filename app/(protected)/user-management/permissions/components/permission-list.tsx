@@ -64,7 +64,7 @@ const PermissionList = () => {
     pageSize: 10,
   });
   const [sorting, setSorting] = useState<SortingState>([
-    { id: 'createdAt', desc: true },
+    { id: 'description', desc: false },
   ]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
@@ -93,11 +93,11 @@ const PermissionList = () => {
     sorting,
     searchQuery,
   }: DataGridApiFetchParams): Promise<DataGridApiResponse<UserPermission>> => {
-    const sortField = sorting?.[0]?.id || 'createdAt';
+    const sortField = sorting?.[0]?.id || 'name';
     const sortDirection = sorting?.[0]?.desc ? 'desc' : 'asc';
 
     const params = new URLSearchParams({
-      page: String(pageIndex + 1),
+      page: String(pageIndex),
       limit: String(pageSize),
       ...(sortField ? { sort: sortField, dir: sortDirection } : {}),
       ...(searchQuery ? { query: searchQuery } : {}),
@@ -191,29 +191,6 @@ const PermissionList = () => {
         },
       },
       {
-        id: 'slug',
-        accessorKey: 'slug',
-        header: ({ column }) => (
-          <DataGridColumnHeader title="Slug" column={column} />
-        ),
-        cell: (info) => {
-          const value = info.getValue() as string;
-
-          return (
-            <Badge variant="secondary" appearance="outline">
-              {value}
-            </Badge>
-          );
-        },
-        size: 150,
-        enableSorting: true,
-        enableHiding: false,
-        meta: {
-          headerTitle: 'min-w-[200px]',
-          skeleton: <Skeleton className="w-14 h-8" />,
-        },
-      },
-      {
         id: 'description',
         accessorKey: 'description',
         header: ({ column }) => (
@@ -230,23 +207,6 @@ const PermissionList = () => {
         meta: {
           headerTitle: 'Description',
           skeleton: <Skeleton className="w-28 h-8" />,
-        },
-      },
-      {
-        id: 'createdAt',
-        accessorKey: 'createdAt',
-        header: ({ column }) => (
-          <DataGridColumnHeader title="Created At" column={column} />
-        ),
-        cell: (info) => {
-          const value = info.getValue() as string;
-          return new Date(value).toLocaleString();
-        },
-        enableSorting: true,
-        enableHiding: false,
-        meta: {
-          headerTitle: 'Created At',
-          skeleton: <Skeleton className="w-20 h-8" />,
         },
       },
       {
@@ -364,7 +324,7 @@ const PermissionList = () => {
             <SelectContent>
               <SelectItem value="all">All roles</SelectItem>
               {roleList?.map((role: UserRole) => (
-                <SelectItem key={role.id} value={role.id}>
+                <SelectItem key={role.roleId} value={role.roleId}>
                   {role.name}
                 </SelectItem>
               ))}
