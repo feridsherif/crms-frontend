@@ -1,0 +1,9 @@
+{
+  "messages": {
+    "unauthorized": "",
+    "system_error": "",
+    "invalid_input": "",
+    "data_not_found": "",
+    "delete_restricted_error": ""
+  }
+}

@@ -4,28 +4,26 @@ import authOptions from '@/app/api/auth/[...nextauth]/auth-options';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const query = searchParams.get('query') || ''; // Extract search query
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const query = searchParams.get('query') || '';
 
   try {
     const session = await getServerSession(authOptions);
     if (!session) return NextResponse.json({ message: 'Unauthorized request' }, { status: 401 });
 
-    const res = await fetch(`${API_BASE_URL}/admin/users?query=${encodeURIComponent(query)}&limit=20`, {
+    const res = await fetch(`${API_BASE_URL}/branches?query=${encodeURIComponent(query)}`, {
       headers: { Authorization: `Bearer ${session.accessToken}` },
     });
 
     if (!res.ok) {
       const err = await res.json().catch(() => null);
-      return NextResponse.json({ message: err?.message || 'Failed to fetch users' }, { status: res.status || 500 });
+      return NextResponse.json({ message: err?.message || 'Failed to fetch branches' }, { status: res.status || 500 });
     }
 
     const data = await res.json();
-    // backend may return { users: [...] } or { data: [...] } or an array
-    const users = Array.isArray(data) ? data : data?.users ?? data?.data ?? [];
-
-    return NextResponse.json(users);
+    const items = Array.isArray(data) ? data : data?.data ?? [];
+    return NextResponse.json(items);
   } catch {
     return NextResponse.json({ message: 'Oops! Something went wrong. Please try again in a moment.' }, { status: 500 });
   }

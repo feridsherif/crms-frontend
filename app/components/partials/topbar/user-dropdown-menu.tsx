@@ -46,20 +46,13 @@ export function UserDropdownMenu({ trigger }: { trigger: ReactNode }) {
         {/* Header */}
         <div className="flex items-center justify-between p-3">
           <div className="flex items-center gap-2">
-            <img
-              className="w-9 h-9 rounded-full border border-border"
-              src={'/media/avatars/300-2.png'}
-              alt="User avatar"
-            />
+            <div className="kt-avatar">
+              <div className="kt-avatar-fallback">{getInitials(session?.user.name || '')}</div>
+            </div>
             <div className="flex flex-col">
-              <Link
-                href="/account/home/get-started"
-                className="text-sm text-mono hover:text-primary font-semibold"
-              >
                 {session?.user.name || ''}
-              </Link>
               <Link
-                href="mailto:c.fisher@gmail.com"
+                href={`mailto:${session?.user.email || ''}`}
                 className="text-xs text-muted-foreground hover:text-primary"
               >
                 {session?.user.email || ''}
@@ -67,7 +60,7 @@ export function UserDropdownMenu({ trigger }: { trigger: ReactNode }) {
             </div>
           </div>
           <Badge variant="primary" appearance="outline" size="sm">
-            Pro
+            Active
           </Badge>
         </div>
 
@@ -170,4 +163,21 @@ export function UserDropdownMenu({ trigger }: { trigger: ReactNode }) {
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+function getInitials(name: string, max = 2): string {
+  if (!name) return '';
+  const parts = name
+    .trim()
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) {
+    // single word: take first character and optionally second character of the word
+    return parts[0].slice(0, max).toUpperCase();
+  }
+  // multi-word: take first char of first and last words (or first N words)
+  const initials = [parts[0][0], parts[parts.length - 1][0]];
+  return initials.slice(0, max).join('').toUpperCase();
 }

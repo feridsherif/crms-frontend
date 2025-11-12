@@ -1,53 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
-import { getClientIP } from '@/lib/api';
-import { isUnique } from '@/lib/db';
-import { prisma } from '@/lib/prisma';
-import { systemLog } from '@/services/system-log';
-import {
-  RoleSchema,
-  RoleSchemaType,
-} from '@/app/(protected)/user-management/roles/forms/role-schema';
 import authOptions from '@/app/api/auth/[...nextauth]/auth-options';
-import { UserRolePermission } from '@/app/models/user';
+import { RoleSchema } from '@/app/(protected)/user-management/roles/forms/role-schema';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 // GET: Fetch a specific role by ID, including permissions
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions);
-
     if (!session) {
-      return NextResponse.json(
-        { message: 'Unauthorized request' },
-        { status: 401 }, // Unauthorized
-      );
+      return NextResponse.json({ message: 'Unauthorized request' }, { status: 401 });
     }
 
-    const role = await prisma.userRole.findUnique({
-      where: { id: (await params).id },
-      include: {
-        permissions: {
-          include: {
-            permission: true, // Fetch full permission details
-          },
-        },
-      },
+    const { id } = await params;
+
+    const res = await fetch(`${API_BASE_URL}/admin/roles/${id}`, {
+      headers: { Authorization: `Bearer ${session.accessToken}` },
     });
 
-    if (!role) {
+    if (res.status === 404) {
       return NextResponse.json({ message: 'Role not found' }, { status: 404 });
     }
 
-    // Map permissions to a flat structure
-    const permissions = role.permissions.map(
-      (p: UserRolePermission) => p.permission,
-    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      return NextResponse.json(
+        { message: err?.message || 'Failed to fetch role' },
+        { status: res.status || 500 },
+      );
+    }
 
-    return NextResponse.json({ ...role, permissions });
+    const data = await res.json();
+
+    // Ensure permissions are in flat array if backend nests them
+    const permissions = data.permissions || [];
+
+    return NextResponse.json({ ...data, permissions });
   } catch {
     return NextResponse.json(
       { message: 'Oops! Something went wrong. Please try again in a moment.' },
@@ -57,21 +46,13 @@ export async function GET(
 }
 
 // PUT: Edit a specific role by ID
-export async function PUT(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function PUT(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions);
-
     if (!session) {
-      return NextResponse.json(
-        { message: 'Unauthorized request' },
-        { status: 401 }, // Unauthorized
-      );
+      return NextResponse.json({ message: 'Unauthorized request' }, { status: 401 });
     }
 
-    // Await the params to resolve correctly
     const { params } = context;
     const { id } = await params;
 
@@ -79,68 +60,39 @@ export async function PUT(
       return NextResponse.json({ error: 'Invalid input.' }, { status: 400 });
     }
 
-    // Check if record exists
-    const existingCategory = await prisma.userRole.findUnique({
-      where: { id },
-    });
-    if (!existingCategory) {
-      return NextResponse.json(
-        { message: 'Record not found. Someone might have deleted it already.' },
-        { status: 404 },
-      );
-    }
-
     const body = await request.json();
-
     const parsedData = RoleSchema.safeParse(body);
     if (!parsedData.success) {
-      return NextResponse.json(
-        { message: 'Invalid input. Please check your data and try again.' },
-        { status: 400 }, // Bad Request
-      );
+      return NextResponse.json({ message: 'Invalid input. Please check your data and try again.' }, { status: 400 });
     }
 
-    const { name, slug, description, permissions }: RoleSchemaType =
-      parsedData.data;
-
-    // Check uniqueness for name and slug
-    const isUniqueRole = await isUnique('userRole', { slug, name }, { id });
-    if (!isUniqueRole) {
-      return NextResponse.json(
-        { message: 'Name or slug must be unique' },
-        { status: 400 },
-      );
+    // Translate frontend `permissions` (string[] of ids) to backend `permissionIds` (number[])
+    const payload: Record<string, unknown> = { ...parsedData.data };
+    if (Array.isArray((payload as Record<string, unknown>).permissions)) {
+      const perms = (payload as Record<string, unknown>).permissions as unknown as Array<string | number>;
+      const permissionIds = perms.map((p) => Number(p));
+      (payload as Record<string, unknown>).permissionIds = permissionIds;
+      // remove frontend field
+      delete (payload as Record<string, unknown>).permissions;
     }
 
-    // Perform database operations in a transaction
-    const updatedRole = await prisma.$transaction(
-      async (tx: Prisma.TransactionClient) => {
-        // Update role details
-        const role = await tx.userRole.update({
-          where: { id },
-          data: { name, slug, description },
-        });
-
-        // Remove existing permissions regardless of whether `permissions` is empty or not
-        await tx.userRolePermission.deleteMany({
-          where: { roleId: id },
-        });
-
-        // Add new permissions if provided
-        if (permissions && permissions?.length > 0) {
-          const newPermissions = permissions.map((permissionId: string) => ({
-            roleId: id,
-            permissionId,
-          }));
-
-          await tx.userRolePermission.createMany({ data: newPermissions });
-        }
-
-        return role;
+    // Call backend API to update role
+    const res = await fetch(`${API_BASE_URL}/admin/roles/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.accessToken}`,
       },
-    );
+      body: JSON.stringify(payload),
+    });
 
-    return NextResponse.json(updatedRole);
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      return NextResponse.json({ message: err?.message || 'Failed to update role' }, { status: res.status || 500 });
+    }
+
+    const updated = await res.json();
+    return NextResponse.json(updated);
   } catch {
     return NextResponse.json(
       { message: 'Oops! Something went wrong. Please try again in a moment.' },
@@ -150,93 +102,32 @@ export async function PUT(
 }
 
 // DELETE: Remove a specific role by ID
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions);
-
     if (!session) {
-      return NextResponse.json(
-        { message: 'Unauthorized request' },
-        { status: 401 }, // Unauthorized
-      );
+      return NextResponse.json({ message: 'Unauthorized request' }, { status: 401 });
     }
 
-    const clientIp = getClientIP(request);
     const { id } = await params;
-
-    // Check if id passed
     if (!id) {
       return NextResponse.json({ error: 'Invalid input.' }, { status: 400 });
     }
 
-    // Check if record exists
-    const existingCategory = await prisma.userRole.findUnique({
-      where: { id },
-    });
-    if (!existingCategory) {
-      return NextResponse.json(
-        { message: 'Record not found. Someone might have deleted it already.' },
-        { status: 404 },
-      );
-    }
-
-    // Check if the role exists
-    const role = await prisma.userRole.findUnique({
-      where: { id },
+    // Call backend API to delete role
+    const res = await fetch(`${API_BASE_URL}/admin/roles/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${session.accessToken}` },
     });
 
-    if (!role) {
+    if (res.status === 404) {
       return NextResponse.json({ message: 'Role not found' }, { status: 404 });
     }
 
-    // Check if the role is protected
-    if (role.isProtected) {
-      return NextResponse.json(
-        { message: 'Cannot delete a protected role' },
-        { status: 403 },
-      );
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      return NextResponse.json({ message: err?.message || 'Failed to delete role' }, { status: res.status || 500 });
     }
-
-    // Check if the role is assigned to any user
-    const roleAssignedToUsers = await prisma.user.count({
-      where: { roleId: id },
-    });
-
-    if (roleAssignedToUsers > 0) {
-      return NextResponse.json(
-        { message: 'Role is assigned to users and cannot be deleted' },
-        { status: 403 },
-      );
-    }
-
-    // Delete the role and its associated permissions in a transaction
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Delete linked role permissions
-      await tx.userRolePermission.deleteMany({
-        where: { roleId: id },
-      });
-
-      // Delete the permission itself
-      await tx.userRole.delete({
-        where: { id },
-      });
-
-      // Log the event
-      await systemLog(
-        {
-          event: 'delete',
-          userId: session.user.id,
-          entityId: id,
-          entityType: 'user.role',
-          description: 'User role deleted.',
-          ipAddress: clientIp,
-        },
-        tx,
-      );
-    });
 
     return NextResponse.json({ message: 'Role deleted successfully' });
   } catch {

@@ -71,7 +71,6 @@ const RoleEditDialog = ({
     resolver: zodResolver(RoleSchema),
     defaultValues: {
       name: '',
-      slug: '',
       description: '',
       permissions: [],
     },
@@ -80,11 +79,17 @@ const RoleEditDialog = ({
 
   useEffect(() => {
     if (open) {
-      const permissionIds: string[] = role?.permissions?.map((p) => p.id) ?? [];
+      // Normalize various backend shapes for role.permissions
+      const permissionIds: string[] = (role?.permissions ?? []).map((p: unknown) => {
+        // p may be a permission object, or a join object with permissionId, or nested { permission: { id } }
+        const obj = p as Record<string, unknown>;
+        const nested = obj.permission as Record<string, unknown> | undefined;
+        const id = obj?.id ?? obj?.permissionId ?? nested?.id ?? nested?.permissionId ?? obj?.name;
+        return id !== undefined && id !== null ? String(id) : '';
+  }).filter((v) => Boolean(v));
 
       form.reset({
         name: role?.name || '',
-        slug: role?.slug || '',
         description: role?.description ?? '',
         permissions: permissionIds,
       });
@@ -163,10 +168,18 @@ const RoleEditDialog = ({
   const isProcessing = mutation.status === 'pending';
 
   const handleSubmit = (values: RoleSchemaType) => {
+    // Also send permissionNames alongside ids so components that expect names can use them
+    const permissionNames = selectedPermissions.map((id) => {
+      const p = permissionList?.find((perm: UserPermission) => String(perm.id) === id || perm.name === id);
+      return p?.name ?? String(id);
+    });
+
     const payload = {
       ...values,
       permissions: selectedPermissions || [],
+      permissionNames,
     };
+
     mutation.mutate(payload);
   };
 
@@ -207,23 +220,7 @@ const RoleEditDialog = ({
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="slug"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Slug</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="E.g: users:delete"
-                      {...field}
-                      disabled={!!role}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* slug removed - backend uses description / permissions for identification */}
             <FormField
               control={form.control}
               name="description"
@@ -247,11 +244,13 @@ const RoleEditDialog = ({
                     {selectedPermissions.length > 0 ? (
                       selectedPermissions.map((permissionId) => {
                         const permission = permissionList?.find(
-                          (p: UserPermission) => p.id === permissionId,
+                          (p: UserPermission) => String(p.id) === permissionId || p.name === permissionId,
                         );
+                        const key = `${permission?.name ?? permissionId}-${permissionId}`;
+                        const display = permission?.description ?? permission?.name ?? permission?.slug ?? permissionId;
                         return (
-                          <Badge key={permissionId} variant="secondary">
-                            {permission?.slug}
+                          <Badge key={key} variant="secondary">
+                            {display}
                             <BadgeButton
                               onClick={() =>
                                 togglePermissionSelection(permissionId)
@@ -287,31 +286,29 @@ const RoleEditDialog = ({
                               <CommandEmpty>No permissions found.</CommandEmpty>
                               <CommandGroup>
                                 <ScrollArea className="h-[200px]">
-                                  {permissionList?.map(
-                                    (permission: UserPermission) => (
+                                  {permissionList?.map((permission: UserPermission, idx: number) => {
+                                    const itemValue = String(permission.id ?? permission.name ?? `perm-${idx}`);
+                                    return (
                                       <CommandItem
-                                        key={permission.id}
-                                        onSelect={() =>
-                                          togglePermissionSelection(
-                                            permission.id,
-                                          )
+                                        key={permission.id ?? permission.name ?? permission.slug ?? `perm-${idx}`}
+                                        value={itemValue}
+                                        onSelect={(currentValue: string) =>
+                                          togglePermissionSelection(currentValue)
                                         }
                                       >
-                                        <span className="grow">
-                                          {permission.slug}
-                                        </span>
-                                        <CommandCheck
-                                          className={cn(
-                                            selectedPermissions.includes(
-                                              permission.id,
-                                            )
-                                              ? 'opacity-100'
-                                              : 'opacity-0',
-                                          )}
-                                        />
+                                      <span className="grow">
+                                        {permission.description ?? permission.name ?? permission.slug}
+                                      </span>
+                                      <CommandCheck
+                                        className={cn(
+                                          selectedPermissions.includes(itemValue)
+                                            ? 'opacity-100'
+                                            : 'opacity-0',
+                                        )}
+                                      />
                                       </CommandItem>
-                                    ),
-                                  )}
+                                    );
+                                  })}
                                 </ScrollArea>
                               </CommandGroup>
                             </CommandList>

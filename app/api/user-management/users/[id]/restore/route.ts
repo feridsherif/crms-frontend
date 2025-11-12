@@ -1,69 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { getClientIP } from '@/lib/api';
-import { prisma } from '@/lib/prisma';
-import { systemLog } from '@/services/system-log';
 import authOptions from '@/app/api/auth/[...nextauth]/auth-options';
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    // Validate user session
     const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ message: 'Unauthorized request' }, { status: 401 });
 
-    if (!session) {
-      return NextResponse.json(
-        { message: 'Unauthorized request' },
-        { status: 401 }, // Unauthorized
-      );
-    }
-
-    const clientIp = getClientIP(request);
     const { id } = await params;
+    if (!id) return NextResponse.json({ error: 'Invalid input.' }, { status: 400 });
 
-    if (!id) {
-      return NextResponse.json(
-        { error: 'Invalid input.' },
-        { status: 400 }, // Bad request
-      );
-    }
-
-    // Use a transaction to insert multiple records atomically
-    const result = await prisma.$transaction(async (tx) => {
-      const user = await prisma.user.update({
-        where: { id, isProtected: false },
-        data: { isTrashed: false },
-      });
-
-      // Log the event
-      await systemLog(
-        {
-          event: 'restore',
-          userId: session.user.id,
-          entityId: user.id,
-          entityType: 'user',
-          description: 'User restored.',
-          ipAddress: clientIp,
-        },
-        tx,
-      );
-
-      return user;
+    const res = await fetch(`${API_BASE_URL}/admin/users/${id}/restore`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${session.accessToken}` },
     });
 
-    return NextResponse.json(
-      {
-        message: 'User successfully restored.',
-        user: result,
-      },
-      { status: 200 },
-    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      return NextResponse.json({ message: err?.message || 'Failed to restore user' }, { status: res.status || 500 });
+    }
+
+    const data = await res.json();
+    return NextResponse.json({ message: 'User successfully restored.', user: data }, { status: 200 });
   } catch {
-    return NextResponse.json(
-      { message: 'Oops! Something went wrong. Please try again in a moment.' },
-      { status: 500 },
-    );
+    return NextResponse.json({ message: 'Oops! Something went wrong. Please try again in a moment.' }, { status: 500 });
   }
 }

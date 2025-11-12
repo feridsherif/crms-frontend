@@ -35,6 +35,8 @@ export interface User {
 
 export interface UserRole {
   roleId: string;
+  // Backwards-compatible id alias: some backend responses use `roleId`, others `id`
+  id?: string;
   slug: string;
   name: string;
   description?: string | null;

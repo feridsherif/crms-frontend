@@ -279,17 +279,8 @@ export const MENU_SIDEBAR: MenuConfig = [
   },
   {
     title: 'Permissions Management',
-    icon: ShieldUser,
-    children: [
-      {
-        title: 'Permissions',
-        path: '/user-management/permissions',
-      },
-      {
-        title: 'Create Permission',
-        path: '/user-management/roles',
-      },
-    ],
+    // icon: ShieldUser,
+    path: '/user-management/permissions',
   },
   {
     title: 'Store - Client',

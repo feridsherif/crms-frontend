@@ -17,7 +17,7 @@ export function Footer() {
               target="_blank"
               className="text-secondary-foreground hover:text-primary"
             >
-              Keenthemes Inc.
+              A HiLCoE Assignment.
             </a>
           </div>
           <nav className="flex order-1 md:order-2 gap-4 font-normal text-sm text-muted-foreground">
@@ -27,13 +27,6 @@ export function Footer() {
               className="hover:text-primary"
             >
               Docs
-            </a>
-            <a
-              href={generalSettings.purchaseLink}
-              target="_blank"
-              className="hover:text-primary"
-            >
-              Purchase
             </a>
             <a
               href={generalSettings.faqLink}
@@ -48,13 +41,6 @@ export function Footer() {
               className="hover:text-primary"
             >
               Support
-            </a>
-            <a
-              href={generalSettings.licenseLink}
-              target="_blank"
-              className="hover:text-primary"
-            >
-              License
             </a>
           </nav>
         </div>

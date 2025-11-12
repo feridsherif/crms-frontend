@@ -14,7 +14,6 @@ import {
 } from '@tanstack/react-table';
 import { Ellipsis, Plus, Search, X } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -43,16 +42,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+// select removed
 import { Skeleton } from '@/components/ui/skeleton';
-import { UserPermission, UserRole } from '@/app/models/user';
-import { useRoleSelectQuery } from '../../roles/hooks/use-role-select-query';
+import { UserPermission } from '@/app/models/user';
 import PermissionDeleteDialog from './permission-delete-dialog';
 import PermissionEditDialog from './permission-edit-dialog';
 import PermissionGroupDeleteDialog from './permission-group-delete-dialog';
@@ -78,13 +70,12 @@ const PermissionList = () => {
   const [deletePermission, setDeletePermission] =
     useState<UserPermission | null>(null);
   const [deletePermissionIds, setDeletePermissionIds] = useState<string[]>([]);
-  const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  // role filtering removed
 
   // Query state management
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Role select query
-  const { data: roleList } = useRoleSelectQuery();
+  // Role select removed — roles are fetched directly where needed
 
   // Fetch permissions from the server API
   const fetchPermissions = async ({
@@ -96,15 +87,14 @@ const PermissionList = () => {
     const sortField = sorting?.[0]?.id || 'name';
     const sortDirection = sorting?.[0]?.desc ? 'desc' : 'asc';
 
-    const params = new URLSearchParams({
-      page: String(pageIndex),
-      limit: String(pageSize),
-      ...(sortField ? { sort: sortField, dir: sortDirection } : {}),
-      ...(searchQuery ? { query: searchQuery } : {}),
-      ...(selectedRole && selectedRole !== 'all'
-        ? { roleId: selectedRole }
-        : {}),
-    });
+    const params = new URLSearchParams();
+    params.append('page', String(pageIndex));
+    params.append('limit', String(pageSize));
+    if (sortField) {
+      params.append('sort', sortField);
+      params.append('dir', sortDirection);
+    }
+    if (searchQuery) params.append('query', searchQuery);
 
     const response = await apiFetch(
       `/api/user-management/permissions?${params.toString()}`,
@@ -121,21 +111,12 @@ const PermissionList = () => {
 
   // Permissions query
   const { data, isLoading } = useQuery({
-    queryKey: [
-      'user-permissions',
-      pagination,
-      sorting,
-      searchQuery,
-      selectedRole,
-    ],
+    queryKey: ['user-permissions', pagination, sorting, searchQuery],
     queryFn: () =>
       fetchPermissions({
         pageIndex: pagination.pageIndex,
         pageSize: pagination.pageSize,
         sorting,
-        filters: [
-          ...(selectedRole ? [{ id: 'role', value: selectedRole }] : []),
-        ],
         searchQuery,
       }),
     staleTime: Infinity,
@@ -146,10 +127,7 @@ const PermissionList = () => {
   });
 
   // Handle row selection
-  const handleRoleSelection = (roleId: string) => {
-    setSelectedRole(roleId);
-    setPagination({ ...pagination, pageIndex: 0 }); // Reset to first page when filtering
-  };
+  // role selection handler removed
 
   useEffect(() => {
     const selectedRowIds = Object.keys(rowSelection);
@@ -312,24 +290,7 @@ const PermissionList = () => {
               </Button>
             )}
           </div>
-          <Select
-            disabled={isLoading && true}
-            onValueChange={handleRoleSelection}
-            value={selectedRole || 'all'}
-            defaultValue="all"
-          >
-            <SelectTrigger className="w-full sm:w-36">
-              <SelectValue placeholder="Filter by role" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All roles</SelectItem>
-              {roleList?.map((role: UserRole) => (
-                <SelectItem key={role.roleId} value={role.roleId}>
-                  {role.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Role filter removed - backend permission list will not be filtered by role here */}
         </div>
         <CardToolbar>
           {deletePermissionIds.length > 0 && (

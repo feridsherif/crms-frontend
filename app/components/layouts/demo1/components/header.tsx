@@ -4,15 +4,11 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { SearchDialog } from '@/partials/dialogs/search/search-dialog';
-import { AppsDropdownMenu } from '@/partials/topbar/apps-dropdown-menu';
-import { ChatSheet } from '@/partials/topbar/chat-sheet';
 import { NotificationsSheet } from '@/partials/topbar/notifications-sheet';
 import { UserDropdownMenu } from '@/partials/topbar/user-dropdown-menu';
 import {
   Bell,
-  LayoutGrid,
   Menu,
-  MessageCircleMore,
   Search,
   SquareChevronRight,
 } from 'lucide-react';
@@ -31,13 +27,13 @@ import {
 import { Container } from '@/components/common/container';
 import { StoreClientTopbar } from '@/app/(protected)/store-client/components/common/topbar';
 import { Breadcrumb } from './breadcrumb';
-import { MegaMenu } from './mega-menu';
-import { MegaMenuMobile } from './mega-menu-mobile';
+// import { MegaMenu } from './mega-menu';
+// import { MegaMenuMobile } from './mega-menu-mobile';
 import { SidebarMenu } from './sidebar-menu';
 
 export function Header() {
   const [isSidebarSheetOpen, setIsSidebarSheetOpen] = useState(false);
-  const [isMegaMenuSheetOpen, setIsMegaMenuSheetOpen] = useState(false);
+  // const [isMegaMenuSheetOpen, setIsMegaMenuSheetOpen] = useState(false);
 
   const pathname = usePathname();
   const mobileMode = useIsMobile();
@@ -48,7 +44,7 @@ export function Header() {
   // Close sheet when route changes
   useEffect(() => {
     setIsSidebarSheetOpen(false);
-    setIsMegaMenuSheetOpen(false);
+    // setIsMegaMenuSheetOpen(false);
   }, [pathname]);
 
   return (
@@ -91,28 +87,7 @@ export function Header() {
                 </SheetContent>
               </Sheet>
             )}
-            {mobileMode && (
-              <Sheet
-                open={isMegaMenuSheetOpen}
-                onOpenChange={setIsMegaMenuSheetOpen}
-              >
-                <SheetTrigger asChild>
-                  <Button variant="ghost" mode="icon">
-                    <SquareChevronRight className="text-muted-foreground/70" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent
-                  className="p-0 gap-0 w-[275px]"
-                  side="left"
-                  close={false}
-                >
-                  <SheetHeader className="p-0 space-y-0" />
-                  <SheetBody className="p-0 overflow-y-auto">
-                    <MegaMenuMobile />
-                  </SheetBody>
-                </SheetContent>
-              </Sheet>
-            )}
+            
           </div>
         </div>
 
@@ -120,7 +95,9 @@ export function Header() {
         {pathname.startsWith('/account') ? (
           <Breadcrumb />
         ) : (
-          !mobileMode && <MegaMenu />
+          <div className="lg:flex lg:flex-1 lg:items-center">
+            Restaurant Management System
+          </div>
         )}
 
         {/* HeaderTopbar */}
@@ -152,30 +129,6 @@ export function Header() {
                     className="size-9 hover:bg-primary/10 hover:[&_svg]:text-primary"
                   >
                     <Bell className="size-4.5!" />
-                  </Button>
-                }
-              />
-              <ChatSheet
-                trigger={
-                  <Button
-                    variant="ghost"
-                    mode="icon"
-                    shape="circle"
-                    className="size-9 hover:bg-primary/10 hover:[&_svg]:text-primary"
-                  >
-                    <MessageCircleMore className="size-4.5!" />
-                  </Button>
-                }
-              />
-              <AppsDropdownMenu
-                trigger={
-                  <Button
-                    variant="ghost"
-                    mode="icon"
-                    shape="circle"
-                    className="size-9 hover:bg-primary/10 hover:[&_svg]:text-primary"
-                  >
-                    <LayoutGrid className="size-4.5!" />
                   </Button>
                 }
               />

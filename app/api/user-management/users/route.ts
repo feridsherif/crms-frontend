@@ -21,16 +21,31 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized request' }, { status: 401 });
     }
 
-    // Call backend API for users
-    const res = await fetch(`${API_BASE_URL}/users?query=${query}&roleId=${roleId}&status=${status}&page=${page}&limit=${limit}&sort=${sortField}&dir=${sortDirection}`, {
-      headers: { Authorization: `Bearer ${session.accessToken}` },
-    });
-    const data = await res.json();
+    // Call backend API for users (use admin paginated endpoint)
+    // Backend paginated endpoints in Postman use `page` (0-based) and `size`.
+    const backendPage = Math.max(0, page - 1);
+    const res = await fetch(
+      `${API_BASE_URL}/admin/users/paginated?query=${encodeURIComponent(query)}&roleId=${encodeURIComponent(
+        roleId,
+      )}&status=${encodeURIComponent(status)}&page=${backendPage}&size=${limit}&sort=${encodeURIComponent(
+        sortField,
+      )}&dir=${encodeURIComponent(sortDirection)}`,
+      {
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+      },
+    );
+
+    const raw = await res.json().catch(() => null);
+    const pageData = raw?.data ?? raw;
+    const items = Array.isArray(pageData?.content)
+      ? pageData.content
+      : pageData?.data ?? pageData?.users ?? [];
+    const total = pageData?.totalElements ?? pageData?.total ?? 0;
 
     return NextResponse.json({
-      data: data.users || [],
+      data: items,
       pagination: {
-        total: data.total || 0,
+        total,
         page,
         limit,
       },
@@ -59,8 +74,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Call backend API to create user
-    const res = await fetch(`${API_BASE_URL}/users`, {
+    // Call backend API to create user (admin path)
+    const res = await fetch(`${API_BASE_URL}/admin/users`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

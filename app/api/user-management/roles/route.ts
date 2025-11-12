@@ -18,19 +18,28 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: 'Unauthorized request' }, { status: 401 });
     }
 
-    // Call backend API for roles
-    const res = await fetch(`${API_BASE_URL}/admin/roles?query=${query}&page=${page}&limit=${limit}`, {
-      headers: { Authorization: `Bearer ${session.accessToken}` },
-    });
-    const data = await res.json();
+    // Call backend API for roles (paginated). Backend returns paginated data under `data.content` / `data.totalElements`.
+    const backendPage = Math.max(0, page - 1);
+    const res = await fetch(
+      `${API_BASE_URL}/admin/roles/paginated?query=${encodeURIComponent(query)}&page=${backendPage}&size=${limit}`,
+      {
+        headers: { Authorization: `Bearer ${session.accessToken}` },
+      },
+    );
+
+    const raw = await res.json().catch(() => null);
+    console.log('Roles raw response:', raw);
+    const pageData = raw?.data ?? raw;
+    const items = Array.isArray(pageData?.content) ? pageData.content : pageData?.data ?? pageData?.roles ?? [];
+    const total = pageData?.totalElements ?? pageData?.total ?? 0;
 
     return NextResponse.json({
-      data: data.roles || [],
+      data: items,
       pagination: {
-        total: data.total || 0,
+        total,
         page,
       },
-      empty: (data.total || 0) === 0,
+      empty: total === 0,
     });
   } catch {
     return NextResponse.json(
@@ -57,6 +66,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Prepare payload for backend: accept frontend `permissions` (string[] of ids)
+    // and translate to backend `permissionIds` (number[])
+  const payload: Record<string, unknown> = { ...parsedData.data };
+    if (Array.isArray(payload.permissions)) {
+      payload.permissionIds = payload.permissions.map((p: string | number) => Number(p));
+      delete payload.permissions;
+    }
+
     // Call backend API to create role
     const res = await fetch(`${API_BASE_URL}/admin/roles`, {
       method: 'POST',
@@ -64,7 +81,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${session.accessToken}`,
       },
-      body: JSON.stringify(parsedData.data),
+      body: JSON.stringify(payload),
     });
     const createdRole = await res.json();
 
