@@ -81,6 +81,14 @@ export const MENU_SIDEBAR: MenuConfig = [
       },
     ],
   },
+  {
+    title: 'Organization',
+    icon: Building,
+    children: [
+      { title: 'Branches', path: '/branches' },
+      { title: 'Customers', path: '/customers' },
+    ],
+  },
   
 ];
 
