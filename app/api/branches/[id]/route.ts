@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import authOptions from '@/app/api/auth/[...nextauth]/auth-options';
-import { z } from 'zod';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-
-const BranchSchema = z.object({
-  name: z.string().min(1),
-  address: z.string().optional(),
-  phone: z.string().optional(),
-});
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -26,7 +19,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     }
 
     const data = await res.json();
-    return NextResponse.json(data);
+    const item = data?.data ?? data;
+    return NextResponse.json(item);
   } catch {
     return NextResponse.json({ message: 'Oops! Something went wrong. Please try again in a moment.' }, { status: 500 });
   }
@@ -39,13 +33,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params;
     const body = await request.json();
-    const parsed = BranchSchema.safeParse(body);
-    if (!parsed.success) return NextResponse.json({ message: 'Invalid input.' }, { status: 400 });
 
     const res = await fetch(`${API_BASE_URL}/branches/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.accessToken}` },
-      body: JSON.stringify(parsed.data),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {
@@ -54,7 +46,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const data = await res.json();
-    return NextResponse.json(data);
+    const item = data?.data ?? data;
+    return NextResponse.json(item);
   } catch {
     return NextResponse.json({ message: 'Oops! Something went wrong. Please try again in a moment.' }, { status: 500 });
   }

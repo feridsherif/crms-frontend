@@ -1,11 +1,13 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { BranchForm } from '../forms/branch-schema';
 import { apiFetch } from '@/lib/api';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 type Props = {
   open: boolean;
@@ -15,24 +17,43 @@ type Props = {
 };
 
 export default function BranchEditDialog({ open, closeDialog, branch, onSaved }: Props) {
+  const queryClient = useQueryClient();
   const [form, setForm] = useState<BranchForm>({ name: branch?.name ?? '', address: branch?.address ?? '', phone: branch?.phone ?? '' });
-  const [saving, setSaving] = useState(false);
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const url = branch?.branchId ? `/api/system/branches/${branch.branchId}` : '/api/system/branches';
+  useEffect(() => {
+    // keep local form in sync when editing different branch
+    setForm({ name: branch?.name ?? '', address: branch?.address ?? '', phone: branch?.phone ?? '' });
+  }, [branch]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (payload: BranchForm) => {
+      const url = branch?.branchId ? `/api/branches/${branch.branchId}` : '/api/branches';
       const method = branch?.branchId ? 'PUT' : 'POST';
-      const res = await apiFetch(url, { method, body: JSON.stringify(form), headers: { 'Content-Type': 'application/json' } });
-      if (!res.ok) throw new Error('Failed');
+      const res = await apiFetch(url, { method, body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.message || 'Failed to save branch');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      try {
+        queryClient.invalidateQueries({ queryKey: ['branches'] });
+      } catch {}
+      toast.success(branch ? 'Branch updated' : 'Branch created');
       closeDialog();
-  if (onSaved) onSaved();
-    } catch (err) {
-      // simple error handling for now
-      console.error(err);
-    } finally {
-      setSaving(false);
-    }
+      if (onSaved) onSaved();
+    },
+    onError: (err: unknown) => {
+      const msg = (err instanceof Error ? err.message : String(err)) || 'Failed to save branch';
+      toast.error(msg);
+    },
+  });
+
+  const saving = saveMutation.status === 'pending';
+
+  const handleSave = () => {
+    saveMutation.mutate(form);
   };
 
   return (
