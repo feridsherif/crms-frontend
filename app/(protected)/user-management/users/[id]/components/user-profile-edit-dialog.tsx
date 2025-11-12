@@ -41,7 +41,6 @@ import {
 import { LoaderCircleIcon } from 'lucide-react';
 import { User, UserRole } from '@/app/models/user';
 import { useRoleSelectQuery } from '../../../roles/hooks/use-role-select-query';
-import { UserStatusProps } from '../../constants/status';
 import {
   UserProfileSchema,
   UserProfileSchemaType,
@@ -66,7 +65,6 @@ const UserProfileEditDialog = ({
     defaultValues: {
       name: user?.name || '',
       roleId: user?.roleId || '',
-      status: user?.status || '',
     },
     mode: 'onSubmit',
   });
@@ -76,7 +74,6 @@ const UserProfileEditDialog = ({
       form.reset({
         name: user?.name || '',
         roleId: user?.roleId || '',
-        status: user?.status || '',
       });
     }
   }, [open, user, form]);
@@ -188,7 +185,10 @@ const UserProfileEditDialog = ({
                       <SelectContent>
                         <SelectGroup>
                           {roleList?.map((role: UserRole) => (
-                            <SelectItem key={role.id} value={role.id}>
+                            <SelectItem
+                              key={String(role.id ?? role.roleId ?? '')}
+                              value={String(role.id ?? role.roleId ?? '')}
+                            >
                               {role.name}
                             </SelectItem>
                           ))}
@@ -200,37 +200,7 @@ const UserProfileEditDialog = ({
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <FormControl>
-                    <Select
-                      onValueChange={(value) => field.onChange(value)}
-                      defaultValue={field.value}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {Object.entries(UserStatusProps).map(
-                            ([status, { label }]) => (
-                              <SelectItem key={status} value={status}>
-                                {label}
-                              </SelectItem>
-                            ),
-                          )}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Status field removed: backend does not support user status */}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={closeDialog}>
                 Cancel

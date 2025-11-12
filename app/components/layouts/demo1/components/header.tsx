@@ -10,13 +10,14 @@ import {
   Bell,
   Menu,
   Search,
-  SquareChevronRight,
 } from 'lucide-react';
 import { toAbsoluteUrl } from '@/lib/helpers';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useScrollPosition } from '@/hooks/use-scroll-position';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useSession } from 'next-auth/react';
 import {
   Sheet,
   SheetBody,
@@ -36,6 +37,10 @@ export function Header() {
   // const [isMegaMenuSheetOpen, setIsMegaMenuSheetOpen] = useState(false);
 
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const user = (session?.user as unknown) as
+    | { avatar?: string; name?: string; username?: string; email?: string }
+    | undefined;
   const mobileMode = useIsMobile();
 
   const scrollPosition = useScrollPosition();
@@ -92,7 +97,7 @@ export function Header() {
         </div>
 
         {/* Main Content (MegaMenu or Breadcrumbs) */}
-        {pathname.startsWith('/account') ? (
+        {(pathname || '').startsWith('/account') ? (
           <Breadcrumb />
         ) : (
           <div className="lg:flex lg:flex-1 lg:items-center">
@@ -102,7 +107,7 @@ export function Header() {
 
         {/* HeaderTopbar */}
         <div className="flex items-center gap-3">
-          {pathname.startsWith('/store-client') ? (
+          {(pathname || '').startsWith('/store-client') ? (
             <StoreClientTopbar />
           ) : (
             <>
@@ -134,11 +139,15 @@ export function Header() {
               />
               <UserDropdownMenu
                 trigger={
-                  <img
-                    className="size-9 rounded-full border-2 border-green-500 shrink-0 cursor-pointer"
-                    src={toAbsoluteUrl('/media/avatars/300-2.png')}
-                    alt="User Avatar"
-                  />
+                  <Avatar className="size-9 rounded-full border-2 border-green-500 shrink-0 cursor-pointer">
+                    {user?.avatar ? (
+                      <AvatarImage src={user.avatar} alt={user.name ?? ''} />
+                    ) : (
+                      <AvatarFallback className="text-sm">
+                        {getInitials(user?.username || user?.name || user?.email || '')}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
                 }
               />
             </>
@@ -147,4 +156,19 @@ export function Header() {
       </Container>
     </header>
   );
+}
+
+function getInitials(name: string, max = 2): string {
+  if (!name) return '';
+  const parts = name
+    .trim()
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) {
+    return parts[0].slice(0, max).toUpperCase();
+  }
+  const initials = [parts[0][0], parts[parts.length - 1][0]];
+  return initials.slice(0, max).join('').toUpperCase();
 }

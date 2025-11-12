@@ -39,7 +39,10 @@ const UserHero = ({ user, isLoading }: UserProfileProps) => {
     const [showCopied, setShowCopied] = useState(false);
 
     const handleUserIdCopy = () => {
-      copyToClipboard(user.id);
+      // Prefer copying username; fallback to name or id
+      const u = user as unknown as { username?: string; name?: string; id?: string };
+      const toCopy = u.username ?? u.name ?? u.id ?? '';
+      copyToClipboard(String(toCopy));
       setShowCopied(true);
       setTimeout(() => {
         setShowCopied(false);
@@ -50,29 +53,29 @@ const UserHero = ({ user, isLoading }: UserProfileProps) => {
       <div className="flex items-center gap-5 mb-5">
         <Avatar className="h-14 w-14">
           {user.avatar ? (
-            <AvatarImage src={user.avatar} alt={user.name || ''} />
+            <AvatarImage src={user.avatar} alt={((user as unknown) as { username?: string; name?: string }).username ?? user.name ?? ''} />
           ) : (
             <AvatarFallback className="text-xl">
-              {getInitials(user.name || user.email)}
+              {getInitials(((user as unknown) as { username?: string; name?: string; email?: string }).username ?? user.name ?? user.email)}
             </AvatarFallback>
           )}
         </Avatar>
         <div className="space-y-px">
-          <div className="font-medium text-base">{user.name}</div>
+          <div className="font-medium text-base">{((user as unknown) as { username?: string; name?: string }).username ?? user.name}</div>
           <div className="text-muted-foreground text-sm">{user.email}</div>
           <div>
             <TooltipProvider>
               <Tooltip delayDuration={50}>
                 <TooltipTrigger className="cursor-pointer">
-                  <Badge
-                    variant="secondary"
-                    appearance="outline"
-                    className="gap-1.5 px-2 py-0.5"
-                    onClick={handleUserIdCopy}
-                  >
-                    <span>User ID: {user.id}</span>
-                    {showCopied && <Check className="text-success size-3" />}
-                  </Badge>
+                    <Badge
+                      variant="secondary"
+                      appearance="outline"
+                      className="gap-1.5 px-2 py-0.5"
+                      onClick={handleUserIdCopy}
+                    >
+                      <span>Username: {(((user as unknown) as { username?: string; name?: string; id?: string }).username ?? user.name ?? user.id)}</span>
+                      {showCopied && <Check className="text-success size-3" />}
+                    </Badge>
                 </TooltipTrigger>
                 <TooltipContent className="text-xs">
                   Click to copy

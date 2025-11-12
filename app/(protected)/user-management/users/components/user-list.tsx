@@ -13,10 +13,11 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { ChevronRight, Plus, Search, X } from 'lucide-react';
+import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
-import { formatDate, formatDateTime, getInitials } from '@/lib/helpers';
+import { getInitials } from '@/lib/helpers';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge, BadgeDot, BadgeProps } from '@/components/ui/badge';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardFooter, CardHeader, CardTable } from '@/components/ui/card';
 import {
@@ -29,17 +30,10 @@ import { DataGridPagination } from '@/components/ui/data-grid-pagination';
 import { DataGridTable } from '@/components/ui/data-grid-table';
 import { Input } from '@/components/ui/input';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+
 import { Skeleton } from '@/components/ui/skeleton';
-import { User, UserStatus } from '@/app/models/user';
-import { useRoleSelectQuery } from '../../roles/hooks/use-role-select-query';
-import { getUserStatusProps, UserStatusProps } from '../constants/status';
+import { User } from '@/app/models/user';
+
 import UserInviteDialog from './user-add-dialog';
 
 const UserList = () => {
@@ -52,11 +46,10 @@ const UserList = () => {
   ]);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRole, setSelectedRole] = useState<string | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<string | null>('all');
+    // role/status filters removed
 
   // Role select query
-  const { data: roleList } = useRoleSelectQuery();
+    // const { data: roleList } = useRoleSelectQuery();
 
   // Fetch users from the server API
   const fetchUsers = async ({
@@ -64,12 +57,7 @@ const UserList = () => {
     pageSize,
     sorting,
     searchQuery,
-    selectedRole,
-    selectedStatus,
-  }: DataGridApiFetchParams & {
-    selectedRole: string | null;
-    selectedStatus: string | null;
-  }): Promise<DataGridApiResponse<User>> => {
+  }: DataGridApiFetchParams): Promise<DataGridApiResponse<User>> => {
     const sortField = sorting?.[0]?.id || '';
     const sortDirection = sorting?.[0]?.desc ? 'desc' : 'asc';
 
@@ -78,12 +66,8 @@ const UserList = () => {
       limit: String(pageSize),
       ...(sortField ? { sort: sortField, dir: sortDirection } : {}),
       ...(searchQuery ? { query: searchQuery } : {}),
-      ...(selectedRole && selectedRole !== 'all'
-        ? { roleId: selectedRole }
-        : {}),
-      ...(selectedStatus && selectedStatus !== 'all'
-        ? { status: selectedStatus }
-        : {}),
+        // role filter removed
+      // status filter removed
     });
 
     const response = await apiFetch(
@@ -101,22 +85,13 @@ const UserList = () => {
 
   // Users query
   const { data, isLoading } = useQuery({
-    queryKey: [
-      'user-users',
-      pagination,
-      sorting,
-      searchQuery,
-      selectedRole,
-      selectedStatus,
-    ],
+  queryKey: ['user-users', pagination, sorting, searchQuery],
     queryFn: () =>
       fetchUsers({
         pageIndex: pagination.pageIndex,
         pageSize: pagination.pageSize,
         sorting,
         searchQuery,
-        selectedRole,
-        selectedStatus,
       }),
     staleTime: Infinity,
     gcTime: 1000 * 60 * 60, // 60 minutes
@@ -125,15 +100,9 @@ const UserList = () => {
     retry: 1,
   });
 
-  const handleRoleSelection = (roleId: string) => {
-    setSelectedRole(roleId);
-    setPagination({ ...pagination, pageIndex: 0 });
-  };
+  // role/status selection removed
 
-  const handleStatusSelection = (status: string) => {
-    setSelectedStatus(status);
-    setPagination({ ...pagination, pageIndex: 0 });
-  };
+  // status selection removed
 
   const handleRowClick = (row: User) => {
     const userId = row.id;
@@ -191,118 +160,42 @@ const UserList = () => {
         enableHiding: false,
       },
       {
-        accessorKey: 'role_name',
-        id: 'role_nameme',
+        accessorKey: 'username',
+        id: 'username',
         header: ({ column }) => (
           <DataGridColumnHeader
-            title="Role"
+            title="Username"
             visibility={true}
             column={column}
           />
         ),
         size: 150,
         cell: ({ row }) => {
-          const role = row.original.role || [];
-          if (!role) return '-';
-
-          return (
-            <Badge variant="secondary" appearance="outline">
-              {role.name}
-            </Badge>
-          );
+          const user = row.original as unknown as { username?: string; email?: string };
+          // backend may provide `username`; fallback to email
+          return <span>{user.username ?? user.email ?? '-'}</span>;
         },
         meta: {
-          headerTitle: 'Role',
+          headerTitle: 'Username',
           skeleton: <Skeleton className="w-28 h-7" />,
         },
         enableSorting: true,
         enableHiding: true,
       },
-      {
-        accessorKey: 'status',
-        id: 'status',
-        header: ({ column }) => (
-          <DataGridColumnHeader
-            title="Status"
-            visibility={true}
-            column={column}
-          />
-        ),
-        cell: ({ row }) => {
-          const statusProps = getUserStatusProps(
-            row.original.status as UserStatus,
-          );
-          const isTrashed = row.original.isTrashed;
-          const variant = statusProps.variant as keyof BadgeProps['variant'];
-
-          return (
-            <div className="inline-flex gap-2.5">
-              <Badge variant={variant} appearance="ghost">
-                <BadgeDot />
-                {statusProps.label}
-              </Badge>
-              {isTrashed && (
-                <Badge variant="destructive" appearance="outline">
-                  Trashed
-                </Badge>
-              )}
-            </div>
-          );
-        },
-        size: 125,
-        meta: {
-          headerTitle: 'Status',
-          skeleton: <Skeleton className="w-14 h-7" />,
-        },
-        enableSorting: true,
-        enableHiding: true,
-      },
-      {
-        accessorKey: 'createdAt',
-        id: 'createdAt',
-        header: ({ column }) => (
-          <DataGridColumnHeader
-            title="Joined"
-            visibility={true}
-            column={column}
-          />
-        ),
-        cell: (info) => formatDate(new Date(info.getValue() as string)),
-        size: 150,
-        meta: {
-          headerTitle: 'Joined',
-          skeleton: <Skeleton className="w-20 h-7" />,
-        },
-        enableSorting: true,
-        enableHiding: true,
-      },
-      {
-        accessorKey: 'lastSignInAt',
-        id: 'lastSignInAt',
-        header: ({ column }) => (
-          <DataGridColumnHeader
-            title="Last Sign In"
-            visibility={true}
-            column={column}
-          />
-        ),
-        cell: (info) =>
-          info.getValue()
-            ? formatDateTime(new Date(info.getValue() as string))
-            : '-',
-        size: 175,
-        meta: {
-          headerTitle: 'Last Sign In',
-          skeleton: <Skeleton className="w-20 h-7" />,
-        },
-        enableSorting: true,
-        enableHiding: true,
-      },
+      // status column removed (backend does not support user status)
+      // Joined column removed
+      // Last Sign In column removed
       {
         accessorKey: 'actions',
         header: '',
-        cell: () => (
-          <ChevronRight className="text-muted-foreground/70 size-3.5" />
+        cell: ({ row }) => (
+          <Link
+            href={`/user-management/users/${row.original.id}`}
+            aria-label="View user details"
+            className="inline-flex items-center"
+          >
+            <ChevronRight className="text-muted-foreground/70 size-3.5" />
+          </Link>
         ),
         meta: {
           skeleton: <Skeleton className="size-4" />,
@@ -374,42 +267,7 @@ const UserList = () => {
               </Button>
             )}
           </div>
-          <Select
-            onValueChange={handleRoleSelection}
-            value={selectedRole || 'all'}
-            defaultValue="all"
-            disabled={isLoading}
-          >
-            <SelectTrigger className="w-full sm:w-36">
-              <SelectValue placeholder="Filter by role" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All roles</SelectItem>
-              {roleList?.map((role: User) => (
-                <SelectItem key={role.id} value={role.id}>
-                  {role.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            onValueChange={handleStatusSelection}
-            value={selectedStatus || 'all'}
-            defaultValue="all"
-            disabled={isLoading}
-          >
-            <SelectTrigger className="w-full sm:w-36">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All users</SelectItem>
-              {Object.entries(UserStatusProps).map(([status, { label }]) => (
-                <SelectItem key={status} value={status}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* role/status filters removed */}
         </div>
         <div className="flex items-center justify-end">
           <Button

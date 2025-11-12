@@ -1,13 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { formatDateTime } from '@/lib/helpers';
-import { Badge, BadgeDot, BadgeProps } from '@/components/ui/badge';
+import { Badge, BadgeDot } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { User, UserStatus } from '@/app/models/user';
-import { getUserStatusProps } from '../../constants/status';
+import { User } from '@/app/models/user';
 import UserProfileEditDialog from './user-profile-edit-dialog';
 
 const UserProfile = ({
@@ -78,65 +76,52 @@ const UserProfile = ({
   );
 
   const Content = () => {
-    const statusPros = getUserStatusProps(user.status as UserStatus);
-    const statusVariant = statusPros.variant as keyof BadgeProps['variant'];
-
     return (
       <Card>
         <CardContent>
           <dl className="grid grid-cols-[auto_1fr] gap-3 text-sm mb-5 [&_dt]:text-muted-foreground">
             <div className="grid grid-cols-subgrid col-span-2 items-baseline">
               <dt className="flex md:w-64">Full name:</dt>
-              <dd>{user.name || 'Not available'}</dd>
+              <dd>{((user as unknown) as { username?: string; name?: string }).username ?? user.name ?? 'Not available'}</dd>
             </div>
             <div className="grid grid-cols-subgrid col-span-2 items-baseline">
               <dt>Email address:</dt>
               <dd className="flex items-center gap-2.5">
                 <span>{user.email}</span>
-                {user.emailVerifiedAt ? (
                   <Badge variant="secondary" appearance="outline">
                     Verified
                   </Badge>
-                ) : (
-                  <Badge variant="warning" appearance="outline">
-                    Not verified
-                  </Badge>
-                )}
               </dd>
             </div>
             <div className="grid grid-cols-subgrid col-span-2 items-baseline">
-              <dt>Role:</dt>
+              <dt>Roles:</dt>
               <dd>
-                <span className="inline-flex items-center gap-1">
-                  {user.role?.name}
-                  {user.role?.isProtected && (
-                    <Badge appearance="outline">System</Badge>
-                  )}
-                </span>
-              </dd>
-            </div>
-            <div className="grid grid-cols-subgrid col-span-2 items-baseline">
-              <dt>Status:</dt>
-              <dd>
-                <div className="inline-flex gap-2.5">
-                  <Badge variant={statusVariant} appearance="ghost">
-                    <BadgeDot />
-                    {statusPros.label}
-                  </Badge>
-                  {user.isTrashed && (
-                    <Badge variant="destructive" appearance="outline">
-                      Trashed
-                    </Badge>
-                  )}
+                <div className="flex flex-wrap gap-2">
+                  {(() => {
+                    type RoleLike = { id?: string | number; name?: string; isProtected?: boolean };
+                    const u = user as unknown as { roles?: RoleLike[]; role?: RoleLike; roleNames?: string[] };
+                    if (Array.isArray(u.roles) && u.roles.length > 0) {
+                      return u.roles.map((r) => (
+                        <Badge key={r.id ?? r.name ?? String(r)}>
+                          {r.name ?? String(r)}
+                          {r.isProtected && <BadgeDot className="ml-2" />}
+                        </Badge>
+                      ));
+                    }
+                    if (u.role) {
+                      return (
+                        <span className="inline-flex items-center gap-1">
+                          {u.role.name}
+                          {u.role.isProtected && <Badge appearance="outline">System</Badge>}
+                        </span>
+                      );
+                    }
+                    if (Array.isArray(u.roleNames) && u.roleNames.length > 0) {
+                      return u.roleNames.map((name) => <Badge key={name}>{name}</Badge>);
+                    }
+                    return <span className="text-muted-foreground">No roles assigned</span>;
+                  })()}
                 </div>
-              </dd>
-            </div>
-            <div className="grid grid-cols-subgrid col-span-2 items-baseline">
-              <dt>Last Sign In:</dt>
-              <dd>
-                {user.lastSignInAt
-                  ? formatDateTime(new Date(user.lastSignInAt))
-                  : 'Never'}
               </dd>
             </div>
           </dl>

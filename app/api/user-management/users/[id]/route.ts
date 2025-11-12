@@ -44,11 +44,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const parsedData = UserProfileSchema.safeParse(body);
     if (!parsedData.success) return NextResponse.json({ message: 'Invalid input.' }, { status: 400 });
 
+    // Prepare payload: backend expects `roleIds` (number[])
+    const payload: Record<string, unknown> = { ...parsedData.data };
+    if (typeof payload.roleId === 'string' && payload.roleId) {
+      payload.roleIds = [Number(payload.roleId)];
+      delete payload.roleId;
+    }
+
     // Proxy update to backend
     const res = await fetch(`${API_BASE_URL}/admin/users/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.accessToken}` },
-      body: JSON.stringify(parsedData.data),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {

@@ -14,17 +14,23 @@ import {
   Search,
   Users,
 } from 'lucide-react';
-import { toAbsoluteUrl } from '@/lib/helpers';
+// import { toAbsoluteUrl } from '@/lib/helpers';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { StoreClientTopbar } from '@/app/(protected)/store-client/components/common/topbar';
 
 export function HeaderTopbar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const user = (session?.user as unknown) as
+    | { avatar?: string; name?: string; username?: string; email?: string }
+    | undefined;
 
   return (
     <div className="flex items-center gap-2 lg:gap-3.5">
       <>
-        {pathname.startsWith('/store-client') ? (
+        {(pathname || '').startsWith('/store-client') ? (
           <StoreClientTopbar />
         ) : (
           <>
@@ -88,11 +94,15 @@ export function HeaderTopbar() {
 
             <UserDropdownMenu
               trigger={
-                <img
-                  className="cursor-pointer size-9 rounded-full border-2 border-mono/25 shrink-0"
-                  src={toAbsoluteUrl('/media/avatars/300-2.png')}
-                  alt="User Avatar"
-                />
+                <Avatar className="cursor-pointer size-9 rounded-full border-2 border-mono/25 shrink-0">
+                  {user?.avatar ? (
+                    <AvatarImage src={user.avatar} alt={user.name ?? ''} />
+                  ) : (
+                    <AvatarFallback className="text-sm">
+                      {getInitials(user?.username || user?.name || user?.email || '')}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
               }
             />
           </>
@@ -100,4 +110,19 @@ export function HeaderTopbar() {
       </>
     </div>
   );
+}
+
+function getInitials(name: string, max = 2): string {
+  if (!name) return '';
+  const parts = name
+    .trim()
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) {
+    return parts[0].slice(0, max).toUpperCase();
+  }
+  const initials = [parts[0][0], parts[parts.length - 1][0]];
+  return initials.slice(0, max).join('').toUpperCase();
 }

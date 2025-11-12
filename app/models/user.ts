@@ -1,25 +1,18 @@
 
 import { SystemSetting } from './system';
 
-// Refactored: UserStatus is now a string union type matching backend API.
-export type UserStatus =
-  | 'ACTIVE'
-  | 'INACTIVE'
-  | 'PENDING'
-  | 'SUSPENDED'
-  | 'DELETED';
-// Add/remove statuses as needed to match your backend API.
+// Note: user status enum removed — backend does not expose user status.
 
 // Models
 export interface User {
   id: string;
   email: string;
+  username?: string | null;
   password?: string | null;
   country?: string | null;
   timezone?: string | null;
   name?: string | null;
   roleId: string;
-  status: UserStatus;
   createdAt: Date;
   updatedAt: Date;
   lastSignInAt?: Date | null;

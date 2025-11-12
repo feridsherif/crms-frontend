@@ -6,18 +6,24 @@ import { ChatSheet } from '@/partials/topbar/chat-sheet';
 import { NotificationsSheet } from '@/partials/topbar/notifications-sheet';
 import { UserDropdownMenu } from '@/partials/topbar/user-dropdown-menu';
 import { ChevronDown, MessageCircleMore, MessageSquareDot } from 'lucide-react';
-import { toAbsoluteUrl } from '@/lib/helpers';
+// import { toAbsoluteUrl } from '@/lib/helpers';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { StoreClientTopbar } from '@/app/(protected)/store-client/components/common/topbar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useSession } from 'next-auth/react';
 
 export function HeaderTopbar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const user = (session?.user as unknown) as
+    | { avatar?: string; name?: string; username?: string; email?: string }
+    | undefined;
 
   return (
     <div className="flex items-center gap-2 lg:gap-3.5 lg:w-[400px] justify-end">
-      {pathname.startsWith('/store-client') ? (
+      {(pathname || '').startsWith('/store-client') ? (
         <StoreClientTopbar />
       ) : (
         <>
@@ -50,11 +56,15 @@ export function HeaderTopbar() {
 
             <UserDropdownMenu
               trigger={
-                <img
-                  className="ms-2.5 size-9 rounded-full border-2 border-success shrink-0 cursor-pointer"
-                  src={toAbsoluteUrl('/media/avatars/300-2.png')}
-                  alt="User Avatar"
-                />
+                <Avatar className="ms-2.5 size-9 rounded-full border-2 border-success shrink-0 cursor-pointer">
+                  {user?.avatar ? (
+                    <AvatarImage src={user.avatar} alt={user.name ?? ''} />
+                  ) : (
+                    <AvatarFallback className="text-sm">
+                      {getInitials(user?.username || user?.name || user?.email || '')}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
               }
             />
           </div>
@@ -80,4 +90,19 @@ export function HeaderTopbar() {
       )}
     </div>
   );
+}
+
+function getInitials(name: string, max = 2): string {
+  if (!name) return '';
+  const parts = name
+    .trim()
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .filter(Boolean);
+  if (parts.length === 0) return '';
+  if (parts.length === 1) {
+    return parts[0].slice(0, max).toUpperCase();
+  }
+  const initials = [parts[0][0], parts[parts.length - 1][0]];
+  return initials.slice(0, max).join('').toUpperCase();
 }

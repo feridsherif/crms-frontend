@@ -40,10 +40,23 @@ export async function GET(request: NextRequest) {
     const items = Array.isArray(pageData?.content)
       ? pageData.content
       : pageData?.data ?? pageData?.users ?? [];
+
+    // Normalize items so each user has an `id` field expected by the UI.
+    const normalizedItems = (items || []).map((it: unknown) => {
+      const item = it as Record<string, unknown>;
+  // Narrow nested shapes safely without `any`
+  const nestedUser = item?.user as Record<string, unknown> | undefined;
+  const idVal = (item?.id as unknown) ?? (item?.userId as unknown) ?? nestedUser?.id ?? (item?._id as unknown) ?? null;
+      const id = idVal !== null && idVal !== undefined ? String(idVal) : undefined;
+      return {
+        ...(item as Record<string, unknown>),
+        id,
+      };
+    });
     const total = pageData?.totalElements ?? pageData?.total ?? 0;
 
     return NextResponse.json({
-      data: items,
+      data: normalizedItems,
       pagination: {
         total,
         page,
@@ -74,6 +87,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Prepare payload for backend: backend expects `roleIds` (number[])
+    const payload: Record<string, unknown> = { ...parsedData.data };
+    if (typeof payload.roleId === 'string' && payload.roleId) {
+      payload.roleIds = [Number(payload.roleId)];
+      delete payload.roleId;
+    }
+
     // Call backend API to create user (admin path)
     const res = await fetch(`${API_BASE_URL}/admin/users`, {
       method: 'POST',
@@ -81,7 +101,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${session.accessToken}`,
       },
-      body: JSON.stringify(parsedData.data),
+      body: JSON.stringify(payload),
     });
     const result = await res.json();
 
