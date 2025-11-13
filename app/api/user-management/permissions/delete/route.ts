@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Prisma } from '@prisma/client';
 import { getServerSession } from 'next-auth/next';
-import { getClientIP } from '@/lib/api';
-import { prisma } from '@/lib/prisma'; // Adjust the import based on your Prisma setup
-import { systemLog } from '@/services/system-log';
 import authOptions from '@/app/api/auth/[...nextauth]/auth-options';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -17,7 +15,6 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const clientIp = getClientIP(request);
     const body = await request.json();
     const { permissionIds } = body;
 
@@ -35,39 +32,20 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Perform deletion in a transaction to ensure atomicity
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Delete linked role permissions
-      await tx.userRolePermission.deleteMany({
-        where: {
-          permissionId: { in: permissionIds },
-        },
+    // Proxy deletes to backend per-id. If your backend supports batch delete, replace with a single call.
+    for (const id of permissionIds) {
+      const res = await fetch(`${API_BASE_URL}/admin/permissions/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.accessToken}` },
       });
 
-      // Delete the permissions themselves
-      await tx.userPermission.deleteMany({
-        where: {
-          id: { in: permissionIds },
-        },
-      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        return NextResponse.json({ message: err?.message || 'Failed to delete selected permissions' }, { status: res.status || 500 });
+      }
+    }
 
-      // Log the event
-      await systemLog(
-        {
-          event: 'create',
-          userId: session.user.id,
-          entityId: permissionIds.join(', '),
-          entityType: 'user.permissions',
-          description: 'User permissions deleted.',
-          ipAddress: clientIp,
-        },
-        tx,
-      );
-    });
-
-    return NextResponse.json({
-      message: 'Delete selected success',
-    });
+    return NextResponse.json({ message: 'Delete selected success' });
   } catch {
     return NextResponse.json(
       { message: 'Oops! Something went wrong. Please try again in a moment.' },

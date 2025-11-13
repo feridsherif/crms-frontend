@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { getClientIP } from '@/lib/api';
-import { prisma } from '@/lib/prisma';
 import { deleteFromS3, uploadToS3 } from '@/lib/s3-upload';
-import { systemLog } from '@/services/system-log';
 import { AccountProfileSchema } from '@/app/(protected)/user-management/account/forms/account-profile-schema';
 import authOptions from '@/app/api/auth/[...nextauth]/auth-options';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,77 +19,26 @@ export async function POST(request: NextRequest) {
     }
 
     const clientIp = getClientIP(request);
-
-    // Parse the form data
     const formData = await request.formData();
 
-    // Extract form data
-    const parsedData = {
-      name: formData.get('name'),
-      avatarFile: formData.get('avatarFile'),
-      avatarAction: formData.get('avatarAction'),
-    };
-
-    // Validate the input using Zod schema
-    const validationResult = AccountProfileSchema.safeParse(parsedData);
-    if (!validationResult.success) {
-      return NextResponse.json({ error: 'Invalid input.' }, { status: 400 });
+    const forward = new FormData();
+    for (const key of Array.from(formData.keys())) {
+      forward.append(key as string, formData.get(key as string) as any);
     }
 
-    const { name, avatarFile, avatarAction } = validationResult.data;
-
-    // Handle avatar removal
-    if (avatarAction === 'remove' && session.user?.avatar) {
-      try {
-        await deleteFromS3(session.user.avatar);
-      } catch (error) {
-        console.error('Failed to remove avatar from S3:', error);
-      }
-    }
-
-    // Handle new avatar upload
-    let avatarUrl = session.user?.avatar || null;
-    if (
-      avatarAction === 'save' &&
-      avatarFile instanceof File &&
-      avatarFile.size > 0
-    ) {
-      try {
-        avatarUrl = await uploadToS3(avatarFile, 'avatars');
-      } catch (error) {
-        console.error('Failed to upload avatar to S3:', error);
-        return NextResponse.json(
-          { message: 'Failed to upload avatar.' },
-          { status: 500 },
-        );
-      }
-    }
-
-    // Save or update the user in the database
-    const updatedUser = await prisma.user.update({
-      where: { id: session.user.id },
-      data: {
-        name,
-        avatar:
-          avatarAction === 'remove'
-            ? null
-            : avatarAction === 'save'
-              ? avatarUrl
-              : undefined,
-      },
+    const res = await fetch(`${API_BASE_URL}/account/profile`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.accessToken}` },
+      body: forward as any,
     });
 
-    // Log the event
-    await systemLog({
-      event: 'update',
-      userId: session.user.id,
-      entityId: session.user.id,
-      entityType: 'user.account',
-      description: 'User account updated.',
-      ipAddress: clientIp,
-    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      return NextResponse.json({ message: err?.message || 'Failed to update profile' }, { status: res.status || 500 });
+    }
 
-    return NextResponse.json(updatedUser);
+    const json = await res.json().catch(() => null);
+    return NextResponse.json(json);
   } catch {
     return NextResponse.json(
       { message: 'Oops! Something went wrong. Please try again in a moment.' },

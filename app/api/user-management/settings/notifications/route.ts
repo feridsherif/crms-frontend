@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { getClientIP } from '@/lib/api';
-import { prisma } from '@/lib/prisma';
-import { systemLog } from '@/services/system-log';
 import { NotificationSettingsSchema } from '@/app/(protected)/user-management/settings/forms/notification-settings-schema';
 import authOptions from '@/app/api/auth/[...nextauth]/auth-options';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,49 +17,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const clientIp = getClientIP(request);
-    const settings = await prisma.systemSetting.findFirst();
-    if (!settings) {
-      return NextResponse.json(
-        { message: 'Settings not found.' },
-        { status: 404 },
-      );
-    }
-
-    // Parse the request body
     const body = await request.json();
     const parsedData = NotificationSettingsSchema.safeParse(body);
     if (!parsedData.success) {
-      return NextResponse.json(
-        { message: 'Invalid input. Please check your data and try again.' },
-        { status: 400 }, // Bad Request
-      );
+      return NextResponse.json({ message: 'Invalid input. Please check your data and try again.' }, { status: 400 });
     }
 
-    // Update the settings in the database
-    const updatedSettings = await prisma.systemSetting.update({
-      where: { id: settings.id }, // Adjust based on your logic to fetch the correct setting
-      data: parsedData.data,
+    const res = await fetch(`${API_BASE_URL}/admin/settings/notifications`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.accessToken}` },
+      body: JSON.stringify(parsedData.data),
     });
 
-    // Log the event
-    await systemLog({
-      event: 'update',
-      userId: session.user.id,
-      entityId: session.user.id,
-      entityType: 'system.settings',
-      description: 'System notifications updated.',
-      ipAddress: clientIp,
-    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      return NextResponse.json({ message: err?.message || 'Failed to update notification settings' }, { status: res.status || 500 });
+    }
 
-    // Return success response
-    return NextResponse.json(
-      {
-        message: 'Notification settings updated successfully',
-        data: updatedSettings,
-      },
-      { status: 200 },
-    );
+    const json = await res.json().catch(() => null);
+    return NextResponse.json({ message: 'Notification settings updated successfully', data: json }, { status: 200 });
   } catch {
     return NextResponse.json(
       {
